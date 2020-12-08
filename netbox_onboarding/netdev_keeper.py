@@ -53,11 +53,20 @@ def get_mgmt_info(
     """
     for if_name, if_data in ip_ifs.items():
         for if_addr, if_addr_data in if_data["ipv4"].items():
+            # si la ip es la misma que la introducida en el onboard
             if if_addr == hostname:
                 return if_name, if_addr_data["prefix_length"]
 
     return default_mgmt_if, default_mgmt_pfxlen
 
+
+def get_svis(hostname, ip_ifs):
+    for if_name, if_data in ip_ifs.items():
+        for if_addr, if_addr_data in if_data["ipv4"].items():
+            # si la ip es la misma que la introducida en el onboard
+            if if_addr == hostname:
+                del ip_ifs[if_name]
+                return ip_ifs
 
 class NetdevKeeper:
     """Used to maintain information about the network device during the onboarding process."""
@@ -291,6 +300,7 @@ class NetdevKeeper:
             "netdev_netmiko_device_type": self.netmiko_device_type,
             "onboarding_class": self.onboarding_class,
             "driver_addon_result": self.driver_addon_result,
+            "netdev_svis": get_svis(hostname=self.hostname, ip_ifs=self.ip_ifs)
         }
 
         return netdev_dict

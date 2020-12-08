@@ -126,6 +126,7 @@ class OnboardingManager:
             "netdev_netmiko_device_type": netdev_dict["netdev_netmiko_device_type"],
             "onboarding_class": netdev_dict["onboarding_class"],
             "driver_addon_result": netdev_dict["driver_addon_result"],
+            "netdev_svis": netdev_dict["netdev_svis"]
         }
 
         onboarding_cls = netdev_dict["onboarding_class"]()

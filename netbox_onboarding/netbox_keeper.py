@@ -87,6 +87,8 @@ class NetboxKeeper:
         netdev_netmiko_device_type=None,
         onboarding_class=None,
         driver_addon_result=None,
+
+        netdev_svis=None
     ):
         """Create an instance and initialize the managed attributes that are used throughout the onboard processing.
 
@@ -106,6 +108,8 @@ class NetboxKeeper:
             netdev_netmiko_device_type (str): Device's Netmiko device type
             onboarding_class (Object): Onboarding Class (future use)
             driver_addon_result (Any): Attached extended result (future use)
+
+            netdev_svis (Dict[str:Dict(str)]: All SVIs and its IP addresses
         """
         self.netdev_mgmt_ip_address = netdev_mgmt_ip_address
         self.netdev_nb_site_slug = netdev_nb_site_slug
@@ -122,6 +126,8 @@ class NetboxKeeper:
         self.netdev_mgmt_pflen = netdev_mgmt_pflen
         self.netdev_netmiko_device_type = netdev_netmiko_device_type
 
+        self.netdev_svis = netdev_svis
+
         self.onboarding_class = onboarding_class
         self.driver_addon_result = driver_addon_result
 
@@ -137,6 +143,8 @@ class NetboxKeeper:
         self.onboarded_device = None
         self.nb_mgmt_ifname = None
         self.nb_primary_ip = None
+
+        self.nb_svi_ifname = {}
 
     def ensure_onboarded_device(self):
         """Lookup if the device already exists in the NetBox.
@@ -403,6 +411,12 @@ class NetboxKeeper:
         """Ensures that the interface associated with the mgmt_ipaddr exists and is assigned to the device."""
         self.nb_mgmt_ifname, _ = Interface.objects.get_or_create(name=self.netdev_mgmt_ifname, device=self.device)
 
+    def ensure_svi(self):
+        """Ensures that the interface associated with the SVI exists and is assigned to the device."""
+        for svi_name in self.netdev_svis.keys():
+            nb_svi_ifname, _ = Interface.objects.get_or_create(name=svi_name, device=self.device)
+            self.nb_svi_ifname[svi_name] = nb_svi_ifname
+
     def ensure_primary_ip(self):
         """Ensure mgmt_ipaddr exists in IPAM, has the device interface, and is assigned as the primary IP address."""
         # see if the primary IP address exists in IPAM
@@ -419,6 +433,15 @@ class NetboxKeeper:
         self.device.primary_ip4 = self.nb_primary_ip
         self.device.save()
 
+    def ensure_svi_ip(self):
+        """Ensure mgmt_ipaddr exists in IPAM, has the device interface, and is assigned as the primary IP address."""
+        for svi_name, svi_data in self.netdev_svis.items():
+            for svi_ip, svi_mask in svi_data['ipv4'].items():
+                mask = svi_mask['prefix_length']
+                nb_svi_ifname = self.nb_svi_ifname[svi_name]
+                logger.info("ASSIGN: IP address %s to %s", svi_ip, nb_svi_ifname.name)
+                created = nb_svi_ifname.ip_addresses.update_or_create(address=f"{svi_ip}/{mask}")
+
     def ensure_device(self):
         """Ensure that the device represented by the DevNetKeeper exists in the NetBox system."""
         self.ensure_onboarded_device()
@@ -432,3 +455,5 @@ class NetboxKeeper:
         if PLUGIN_SETTINGS["create_management_interface_if_missing"]:
             self.ensure_interface()
             self.ensure_primary_ip()
+            self.ensure_svi()
+            self.ensure_svi_ip()
